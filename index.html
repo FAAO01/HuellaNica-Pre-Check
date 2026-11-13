@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es-NI">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="HuellaNica Pre-Check: Sistema web de verificación sanitaria veterinaria y alertas de empadronamiento en Nicaragua (Ley N.° 747)." />
+  <meta name="theme-color" content="#347d78" />
+  <title>HuellaNica Pre-Check | Portal Veterinario y Alertas de Registro</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="funcion.js" defer></script>
+</head>
+<body>
+  <!-- Contenedor de notificaciones flotantes accesible -->
+  <div id="toast-container" class="toast-container" role="region" aria-live="polite" aria-label="Notificaciones del sistema"></div>
+
+  <!-- MODAL DE VERIFICACIÓN (Paso 1) -->
+  <div id="verify-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-verify-title" aria-describedby="modal-verify-desc">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <span class="modal-badge">PASO 1 DE 3 • PRE-CHECK</span>
+          <h2 id="modal-verify-title">Verificar Registro de Mascota</h2>
+        </div>
+        <button type="button" id="btn-close-modal" class="modal-close" aria-label="Cerrar ventana de verificación">
+          ✕
+        </button>
+      </div>
+
+      <p id="modal-verify-desc" class="modal-subtitle">
+        Ingresa tu celular (8 dígitos) o cédula nicaragüense para validar si tu mascota tiene expediente activo.
+      </p>
+
+      <form id="verify-form" class="form-stack">
+        <div class="form-group">
+          <label for="input-identificador">Teléfono o Cédula del Propietario *</label>
+          <div class="input-with-icon">
+            <span class="input-prefix" aria-hidden="true">🇳🇮 +505</span>
+            <input
+              type="text"
+              id="input-identificador"
+              name="identificador"
+              inputmode="text"
+              maxlength="16"
+              pattern="(\d{4}-?\d{4}|\d{3}-?\d{6}-?\d{4}[A-Za-z])"
+              title="Ingresa 8 dígitos de celular (Ej. 8888-1234) o cédula válida (Ej. 001-150590-0012A)"
+              placeholder="8888-1234 o 001-150590-0012A"
+              aria-describedby="identificador-hint"
+              autocomplete="tel"
+              required
+            />
+          </div>
+          <small id="identificador-hint" style="font-size: 0.76rem; color: var(--text-muted);">
+            Formatos válidos: Celular de 8 dígitos o Cédula de 14 caracteres.
+          </small>
+        </div>
+
+        <button type="submit" class="btn-primary btn-lg">
+          Verificar en Base de Datos
+        </button>
+      </form>
+
+      <!-- Escenarios rápidos para auditoría y pruebas -->
+      <div class="demo-helpers">
+        <span class="demo-label">Pruebas rápidas del prototipo:</span>
+        <div class="demo-chips">
+          <button type="button" class="chip chip-success" data-test-id="8888-1234">
+            ✓ Registrado (8888-1234)
+          </button>
+          <button type="button" class="chip chip-warning" data-test-id="8555-0199">
+            ⚠️ No Registrado (8555-0199)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra superior -->
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="4" r="2" />
+            <circle cx="18" cy="8" r="2" />
+            <circle cx="20" cy="16" r="2" />
+            <path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z" />
+          </svg>
+        </div>
+        <div>
+          <span class="brand-title">HuellaNica <span class="badge-accent">Pre-Check</span></span>
+          <span class="brand-subtitle">Red Clínica Veterinaria • Cumplimiento Ley N.° 747</span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <button type="button" id="btn-topbar-verify" class="btn-primary btn-sm">
+          🔍 Verificar Mascota
+        </button>
+        <button type="button" id="btn-toggle-sound" class="btn-ghost" aria-pressed="true" title="Activar o silenciar alerta sonora">
+          <span id="sound-icon" aria-hidden="true">🔔</span>
+          <span class="hide-mobile" id="sound-label">Sonido: ON</span>
+        </button>
+        <button type="button" id="btn-reset-demo" class="btn-ghost" title="Restaurar datos de prueba">
+          <span aria-hidden="true">↻</span> <span class="hide-mobile">Reiniciar</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido principal -->
+  <main class="container main-content">
+    <section class="hero-strip">
+      <div>
+        <h1>Verificación Sanitaria antes de tu Consulta</h1>
+        <p>Comprueba si tu mascota está empadronada. Si aún no tiene expediente, el sistema alerta a recepción y habilita su registro unificado en segundos.</p>
+      </div>
+      <div class="law-pill" role="status">
+        <span class="dot-live" aria-hidden="true"></span>
+        <span id="sync-status-text">Nodo Clínico Activo • Managua, Nicaragua</span>
+      </div>
+    </section>
+
+    <div class="workspace-grid">
+      <!-- COLUMNA IZQUIERDA: Portal Público del Propietario -->
+      <section class="card portal-card" aria-label="Portal de verificación del propietario">
+        <nav class="stepper" id="step-dots" aria-label="Progreso de verificación">
+          <div class="step-item active" data-step="1" aria-current="step">
+            <span class="step-num">1</span>
+            <span class="step-text">Verificar</span>
+          </div>
+          <div class="step-line" aria-hidden="true"></div>
+          <div class="step-item" data-step="2">
+            <span class="step-num">2</span>
+            <span class="step-text">Alerta / Estado</span>
+          </div>
+          <div class="step-line" aria-hidden="true"></div>
+          <div class="step-item" data-step="3">
+            <span class="step-num">3</span>
+            <span class="step-text">Pase Digital</span>
+          </div>
+        </nav>
+
+        <!-- PASO 1: Disparador del Modal -->
+        <div id="step-verify" class="step-panel active">
+          <div class="launch-box">
+            <div class="launch-icon" aria-hidden="true">🩺</div>
+            <h2>Consulta previa de expediente</h2>
+            <p>
+              Antes de confirmar tu turno en la clínica, valida tu número telefónico o cédula en nuestro buscador rápido.
+            </p>
+            <button type="button" id="btn-open-verify-modal" class="btn-primary btn-lg">
+              Iniciar Verificación
+            </button>
+            <span class="launch-hint">Validación instantánea • Cumplimiento sanitario Ley N.° 747</span>
+          </div>
+        </div>
+
+        <!-- PASO 2A: Mascota YA registrada -->
+        <div id="step-registered" class="step-panel hidden">
+          <div class="status-banner status-ok" role="status">
+            <div class="status-icon" aria-hidden="true">✅</div>
+            <div>
+              <h3>¡Propietario Verificado!</h3>
+              <p>Encontramos expediente(s) activo(s) vinculados a <strong id="reg-owner-id"></strong>.</p>
+            </div>
+          </div>
+
+          <div id="registered-pets-container" class="pet-cards-list" role="radiogroup" aria-label="Selecciona la mascota para la cita"></div>
+
+          <div class="form-group">
+            <label for="existing-appt-time">Horario preferido para tu consulta</label>
+            <select id="existing-appt-time" class="form-control">
+              <option value="Hoy - 3:30 PM">Hoy - 3:30 PM (Consulta General)</option>
+              <option value="Hoy - 5:00 PM">Hoy - 5:00 PM (Vacunación / Control)</option>
+              <option value="Mañana - 9:00 AM">Mañana - 9:00 AM (Consulta General)</option>
+              <option value="Mañana - 11:00 AM">Mañana - 11:00 AM (Desparasitación)</option>
+            </select>
+          </div>
+
+          <div class="action-row">
+            <button type="button" id="btn-confirm-existing" class="btn-primary">
+              Confirmar Cita Pre-Check
+            </button>
+            <button type="button" id="btn-add-another-pet" class="btn-secondary">
+              + Registrar otra mascota
+            </button>
+          </div>
+          <button type="button" class="btn-link btn-back-start">← Buscar otro número o cédula</button>
+        </div>
+
+        <!-- PASO 2B: Mascota NO registrada (Alerta + Registro Exprés Unificado) -->
+        <div id="step-unregistered" class="step-panel hidden">
+          <div class="status-banner status-alert pulse-border" role="alert" aria-live="assertive">
+            <div class="status-icon" aria-hidden="true">🚨</div>
+            <div>
+              <h3>Alerta: Mascota No Registrada</h3>
+              <p>
+                El identificador <strong id="alert-identifier-display"></strong> no figura en el padrón sanitario.
+              </p>
+            </div>
+          </div>
+
+          <!-- Canales de notificación + Contingencia WhatsApp -->
+          <div class="notifications-dispatched">
+            <div class="notif-pill">
+              <span aria-hidden="true">🖥️</span> Alerta enviada a Monitor de Recepción
+            </div>
+            <a
+              id="btn-whatsapp-fallback"
+              href="https://wa.me/50588880000?text=Hola%20Clinica%2C%20solicito%20registro%20Pre-Check%20para%20mi%20mascota."
+              target="_blank"
+              rel="noopener noreferrer"
+              class="notif-pill"
+              style="text-decoration: none; border-color: #9ecfb8; color: var(--ok-text); background-color: var(--ok-bg);"
+            >
+              <span aria-hidden="true">📲</span> Respaldo directo vía WhatsApp ↗
+            </a>
+          </div>
+
+          <div class="express-box">
+            <div class="express-header">
+              <h4>Paso 3: Registro Exprés Unificado</h4>
+              <span class="tag-time">~30 segundos</span>
+            </div>
+            <p class="express-desc">Completa estos datos esenciales para vincular tu identidad y crear el expediente clínico:</p>
+
+            <form id="form-registro" class="form-stack">
+              <!-- Vinculación dual para evitar duplicados entre teléfono y cédula -->
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="owner-fullname">Nombre del propietario *</label>
+                  <input type="text" id="owner-fullname" placeholder="Ej. Carlos Mendoza" autocomplete="name" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="owner-secondary-id">Teléfono / Cédula de respaldo *</label>
+                  <input
+                    type="text"
+                    id="owner-secondary-id"
+                    maxlength="16"
+                    placeholder="Vincula tu otro ID (Cédula o Cel)"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="pet-name">Nombre de la mascota *</label>
+                  <input type="text" id="pet-name" placeholder="Ej. Toby, Michi, Canela" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="pet-species">Especie *</label>
+                  <select id="pet-species" required>
+                    <option value="">Seleccionar...</option>
+                    <option value="Perro">Perro (Canino)</option>
+                    <option value="Gato">Gato (Felino)</option>
+                    <option value="Otro">Otro doméstico</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="pet-age">Edad aproximada *</label>
+                  <select id="pet-age" required>
+                    <option value="">Seleccionar...</option>
+                    <option value="Cachorro (< 1 año)">Cachorro (menos de 1 año)</option>
+                    <option value="Adulto (1 - 7 años)">Adulto (1 a 7 años)</option>
+                    <option value="Senior (+ 7 años)">Senior (más de 7 años)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="pet-rabies">Vacuna antirrábica *</label>
+                  <select id="pet-rabies" required>
+                    <option value="">Seleccionar...</option>
+                    <option value="Vigente (Últimos 12 meses)">Vigente (Últimos 12 meses)</option>
+                    <option value="Pendiente / Vencida">Pendiente / Vencida</option>
+                    <option value="Nunca vacunado">Nunca vacunado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="appt-time">Turno de atención deseado</label>
+                <select id="appt-time">
+                  <option value="Hoy - 4:00 PM">Hoy - 4:00 PM</option>
+                  <option value="Hoy - 5:30 PM">Hoy - 5:30 PM</option>
+                  <option value="Mañana - 8:30 AM">Mañana - 8:30 AM</option>
+                  <option value="Mañana - 10:30 AM">Mañana - 10:30 AM</option>
+                </select>
+              </div>
+
+              <button type="submit" class="btn-primary btn-lg">
+                Guardar Expediente y Confirmar Cita
+              </button>
+            </form>
+          </div>
+
+          <button type="button" class="btn-link btn-back-start">← Cancelar y volver al inicio</button>
+        </div>
+
+        <!-- PASO 3: Pase Digital Confirmado -->
+        <div id="step-success" class="step-panel hidden" role="status">
+          <div class="pass-card">
+            <div class="pass-top">
+              <span class="pass-badge">PASE PRE-CHECK ACTIVO</span>
+              <span class="pass-code" id="pass-code">HN-2026-0000</span>
+            </div>
+
+            <div class="pass-body">
+              <h3 id="pass-pet">Nombre Mascota</h3>
+              <p class="pass-meta" id="pass-species-age">Especie • Edad</p>
+
+              <div class="pass-details">
+                <div>
+                  <span class="detail-label">Propietario</span>
+                  <strong id="pass-owner">8888-1234</strong>
+                </div>
+                <div>
+                  <span class="detail-label">Antirrábica</span>
+                  <strong id="pass-rabies">Vigente</strong>
+                </div>
+                <div>
+                  <span class="detail-label">Turno Confirmado</span>
+                  <strong id="pass-time">Hoy - 4:00 PM</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="pass-footer">
+              Presenta este código al llegar a recepción. Tu historial ya está disponible para el médico veterinario.
+            </div>
+          </div>
+
+          <button type="button" class="btn-secondary btn-full btn-back-start">
+            Realizar otra verificación
+          </button>
+        </div>
+      </section>
+
+      <!-- COLUMNA DERECHA: Monitor Interno con Protección de Privacidad (PII) -->
+      <aside class="card clinic-panel" aria-label="Monitor de Recepción Clínica">
+        <div class="clinic-header">
+          <div>
+            <span class="clinic-tag">VISTA INTERNA CLÍNICA</span>
+            <h2>Monitor de Alertas en Recepción</h2>
+          </div>
+          <span class="live-indicator" title="Sincronizado en tiempo real">EN VIVO</span>
+        </div>
+
+        <!-- Métricas agregadas (no exponen PII) -->
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-val" id="stat-checks">0</span>
+            <span class="stat-lbl">Consultas</span>
+          </div>
+          <div class="stat-box stat-warn">
+            <span class="stat-val" id="stat-alerts">0</span>
+            <span class="stat-lbl">Alertas</span>
+          </div>
+          <div class="stat-box stat-ok">
+            <span class="stat-val" id="stat-registered">0</span>
+            <span class="stat-lbl">Empadronados</span>
+          </div>
+        </div>
+
+        <!-- Contenedor colapsable para proteger datos sensibles frente a usuarios públicos -->
+        <details id="clinic-pii-drawer" open>
+          <summary style="cursor: pointer; font-size: 0.8rem; font-weight: 700; color: var(--primary); padding: 0.55rem 0.75rem; background-color: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: 8px; list-style: none;">
+            🔒 Panel de Datos Sensibles (Solo Personal de Recepción) — Clic para ocultar/mostrar
+          </summary>
+
+          <div class="feed-section">
+            <h3>Historial de Notificaciones Disparadas</h3>
+            <div id="alerts-feed" class="alerts-feed" aria-live="polite">
+              <p class="empty-msg">Aún no hay alertas en esta sesión. Abre el verificador y prueba un número no registrado.</p>
+            </div>
+          </div>
+
+          <div class="feed-section">
+            <h3>Padrón Registrado (Base Local)</h3>
+            <ul id="registered-list" class="registered-list"></ul>
+          </div>
+        </details>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>
